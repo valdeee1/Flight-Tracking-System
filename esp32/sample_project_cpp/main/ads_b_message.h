@@ -6,18 +6,27 @@
 class ADS_B_Message 
 {
 public:
-    explicit ADS_B_Message(const std::string& raw_msg);
+    explicit ADS_B_Message(const uint8_t raw_bytes[14]);
+
+    static double calculateLatitude(uint32_t latCprOdd, uint32_t latCprEven, bool isOddNewer);
+    static double calculateLongitude(uint32_t lonCprOdd, uint32_t lonCprEven, bool isOddNewer, double latitude);
+    uint32_t getIcao() const { return icao; }
+    uint8_t getTypeCode() const { return type_code; }
+    bool getIsOdd() const { return is_odd; }
+    uint32_t getLatCpr() const { return lat_cpr; }
+    uint32_t getLonCpr() const { return lon_cpr; }
+    bool hasPositionData() const { return has_position_data; }
+    int getDownlinkFormat() const { return downlink_format; }
 
 private:
-
-    int calculateNL(double lat);
-    double calculateLatitude(uint32_t latCprOdd, uint32_t latCprEven, bool isOddNewer);
-    double calculateLongitude(uint32_t lonCprOdd, uint32_t lonCprEven, bool isOddNewer, double latitude);
-
-    int capability;
-    int icao;
-    int type_code;
-
+    uint8_t capability = 0;
+    uint32_t icao = 0;
+    uint8_t type_code = 0; 
+    bool is_odd;
+    uint32_t lat_cpr;
+    uint32_t lon_cpr;
+    bool has_position_data;
+    uint8_t downlink_format;
 
     enum class Capability : uint8_t {
         LEVEL_1 = 0x00,

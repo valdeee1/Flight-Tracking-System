@@ -13,7 +13,7 @@ static const char *TAG = "SPI";
 
 void vParsingTask(void *pvParameters);
 void vSPITask(void *pvParameters); 
-void initSPI();
+void initSPIAndInterrupts();
 
 constexpr gpio_num_t SPI_MISO_PIN = GPIO_NUM_19;
 constexpr gpio_num_t SPI_MOSI_PIN = GPIO_NUM_23;
@@ -36,7 +36,9 @@ static void IRAM_ATTR spi_irq_handler(void* arg) {
 
 extern "C" void app_main(void)
 {
-    initSPI();
+    initSPIAndInterrupts();
+
+    QueueHandle_t spi_queue = xQueueCreate(10, sizeof(uint8_t[14]));
 
     xTaskCreatePinnedToCore(
         vParsingTask,
@@ -76,7 +78,7 @@ void vSPITask(void *pvParameters) {
     spi_transaction_t transmit;
     
     std::memset(&transmit, 0, sizeof(transmit));
-    transmit.length = 14*8;
+    transmit.length = 14*8; // Size of the message in bits
     transmit.rx_buffer = rx_buffer;
     transmit.tx_buffer = nullptr;
 
@@ -100,7 +102,13 @@ void vSPITask(void *pvParameters) {
     }
 }
 
-void initSPI() {
+void initSPIAndInterrupts() {
+
+    /*
+    
+    TODO muuta master arkkitehtuuri slaveksi
+
+    */
     spi_bus_config_t buscfg = {};
     buscfg.miso_io_num = SPI_MISO_PIN;
     buscfg.mosi_io_num = SPI_MOSI_PIN;
@@ -122,6 +130,7 @@ void initSPI() {
     // Add the device to the SPI bus
     ESP_ERROR_CHECK(spi_bus_add_device(SPI3_HOST, &devcfg, &spi_handle));
 
+    // Initializes interrupt pin for spi
     gpio_config_t io_conf = {};
     io_conf.intr_type = GPIO_INTR_POSEDGE;
     io_conf.pin_bit_mask = 1ULL << SPI_IRQ_PIN;

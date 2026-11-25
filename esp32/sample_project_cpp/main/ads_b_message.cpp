@@ -4,28 +4,31 @@
 
 #define M_PI 3.14159265358979323846
 
-ADS_B_Message::ADS_B_Message(const std::string& raw_msg) 
+// Example 8d461f9b69a9936aef8f984e1b9a
+
+
+ADS_B_Message::ADS_B_Message(const uint8_t raw_bytes[14]) 
 {
-    
+    downlink_format = ((raw_bytes[0] >> 3) & 0b00011111);
+    if(downlink_format == 17){
+        icao = (static_cast<uint32_t>(raw_bytes[1]) << 16) | (static_cast<uint32_t>(raw_bytes[2]) << 8) | static_cast<uint32_t>(raw_bytes[3]);
+        capability = raw_bytes[0] & 0b00000111;
+        type_code = (raw_bytes[4] >> 3) & 0b00011111; 
+        if((type_code >= 9 && type_code <= 18) || (type_code >= 20 && type_code <= 22)) {
+            has_position_data = true;
+            is_odd = ((raw_bytes[6] >> 2) & 0b00000001) != 0;
+            lat_cpr = ((static_cast<uint32_t>(raw_bytes[6]) & 0b00000011) << 15) |
+            (static_cast<uint32_t>(raw_bytes[7]) << 7)                |
+            ((static_cast<uint32_t>(raw_bytes[8]) >> 1) & 0b01111111);
+            lon_cpr = ((static_cast<uint32_t>(raw_bytes[8]) & 0b00000001) << 16) |
+            (static_cast<uint32_t>(raw_bytes[9]) << 8)                |
+            static_cast<uint32_t>(raw_bytes[10]);
+        } else {
+            has_position_data = false;
+        }
+    }
 }
 
-int ADS_B_Message::calculateNL(double lat) 
-{
-    if (std::abs(lat) >= 87.0) return 1;
-    if (std::abs(lat) == 0.0) return 59;
-
-    constexpr double NZ = 15.0;
-    constexpr double DEG2RAD = M_PI / 180.0;
-
-    double num = 1.0 - std::cos(M_PI / (2.0 * NZ));
-    double den = std::pow(std::cos(DEG2RAD * std::abs(lat)), 2);
-    double val = 1.0 - (num / den);
-
-    if (val < -1.0) val = -1.0;
-    if (val > 1.0) val = 1.0;
-
-    return static_cast<int>(std::floor((2.0 * M_PI) / std::acos(val)));
-}
 
 double ADS_B_Message::calculateLatitude(uint32_t latCprOdd, uint32_t latCprEven, bool isOddNewer) 
 {
@@ -40,6 +43,8 @@ double ADS_B_Message::calculateLatitude(uint32_t latCprOdd, uint32_t latCprEven,
     double j = std::floor(59 * lat_i_even - 60 * lat_i_odd + 0.5);
 
     // Calculating latitude
+
+    //Ensuring positive 
     auto pos_mod = [](double a, double n) {
         double r = std::fmod(a, n);
         return (r < 0.0) ? (r + n) : r;
@@ -57,7 +62,29 @@ double ADS_B_Message::calculateLatitude(uint32_t latCprOdd, uint32_t latCprEven,
 double ADS_B_Message::calculateLongitude(uint32_t lonCprOdd, uint32_t lonCprEven, bool isOddNewer, double latitude) 
 {
     // Calculate the number of latitude zones (NL)
-    int nl = calculateNL(latitude);
+    int nl;
+
+    if (std::abs(latitude) >= 87.0)
+    {
+        nl = 1;
+    }
+    else if (std::abs(latitude) == 0.0)
+    {
+        nl = 59;
+    }
+    else {
+        constexpr double NZ = 15.0;
+        constexpr double DEG2RAD = M_PI / 180.0;
+
+        double num = 1.0 - std::cos(M_PI / (2.0 * NZ));
+        double den = std::pow(std::cos(DEG2RAD * std::abs(latitude)), 2);
+        double val = 1.0 - (num / den);
+
+        if (val < -1.0) val = -1.0;
+        if (val > 1.0) val = 1.0;
+
+        nl = static_cast<int>(std::floor((2.0 * M_PI) / std::acos(val)));
+    }
 
     // Calculate the number of longitude zones (ni) based on NL
     int ni0 = std::max(nl, 1);

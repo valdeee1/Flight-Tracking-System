@@ -8,9 +8,9 @@ class AircraftTracker : public ADS_B_Message
 {
 public:
 
-    void addAircraft(const uint32_t icao);
+    void addOrUpdateAircraft(const ADS_B_Message& message);
     void deleteAircraft(uint32_t icao);
-    void getAircraft();
+    void getAircraft( const uint32_t icao);
 
 
 private:
@@ -27,11 +27,13 @@ private:
         bool has_even = false;
         bool has_odd = false;
 
+        bool isActive = false;
+
         double latitude = 0;
         double longitude = 0;
     } Aircraft;
 
-    static constexpr size_t MAX_AIRCRAFT = 32;
+    static constexpr size_t MAX_AIRCRAFT = 64;
 
     std::array<Aircraft, MAX_AIRCRAFT> aircraft_list{};
 

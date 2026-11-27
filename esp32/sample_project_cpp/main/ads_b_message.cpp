@@ -9,23 +9,40 @@
 
 ADS_B_Message::ADS_B_Message(const uint8_t raw_bytes[14]) 
 {
+    uint32_t message_crc = (static_cast<uint32_t>(raw_bytes[11]) << 16) |
+                       (static_cast<uint32_t>(raw_bytes[12]) << 8)  |
+                        static_cast<uint32_t>(raw_bytes[13]);
+    if(calculateCRC(raw_bytes) != message_crc)
+    {
+        isValidMessage = false;
+    }
+
     downlink_format = ((raw_bytes[0] >> 3) & 0b00011111);
-    if(downlink_format == 17){
+
+    if(downlink_format == 17)
+    {
         icao = (static_cast<uint32_t>(raw_bytes[1]) << 16) | (static_cast<uint32_t>(raw_bytes[2]) << 8) | static_cast<uint32_t>(raw_bytes[3]);
         capability = raw_bytes[0] & 0b00000111;
         type_code = (raw_bytes[4] >> 3) & 0b00011111; 
+
         if((type_code >= 9 && type_code <= 18) || (type_code >= 20 && type_code <= 22)) {
+
             has_position_data = true;
             is_odd = ((raw_bytes[6] >> 2) & 0b00000001) != 0;
+
             lat_cpr = ((static_cast<uint32_t>(raw_bytes[6]) & 0b00000011) << 15) |
             (static_cast<uint32_t>(raw_bytes[7]) << 7)                |
             ((static_cast<uint32_t>(raw_bytes[8]) >> 1) & 0b01111111);
+
             lon_cpr = ((static_cast<uint32_t>(raw_bytes[8]) & 0b00000001) << 16) |
             (static_cast<uint32_t>(raw_bytes[9]) << 8)                |
             static_cast<uint32_t>(raw_bytes[10]);
+
         } else {
             has_position_data = false;
         }
+    } else {
+        isValidMessage = false;
     }
 }
 
@@ -120,4 +137,25 @@ double ADS_B_Message::calculateLongitude(uint32_t lonCprOdd, uint32_t lonCprEven
     }
 
     return lon;
+}
+
+uint32_t ADS_B_Message::calculateCRC(const uint8_t raw_bytes[14]) 
+{
+    uint32_t generator = 0xFFF409; 
+    uint32_t crc = 0;
+
+    for(int i = 0; i < 11; i++)
+    {
+        crc ^= (static_cast<uint32_t>(raw_bytes[i] << 16));
+
+        for(int bit = 0; bit < 8; ++bit)
+        {
+            crc <<= 1;
+            if (crc & 0x1000000)
+            {
+                crc ^= generator;
+            }
+        }
+    }
+    return crc & 0x00FFFFFF;
 }

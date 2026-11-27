@@ -7,11 +7,10 @@
 class AircraftTracker : public ADS_B_Message
 {
 public:
-
+    explicit AircraftTracker();
     void addOrUpdateAircraft(const ADS_B_Message& message);
     void deleteAircraft(uint32_t icao);
-    void getAircraft( const uint32_t icao);
-
+    void deleteInActiveAircraft();
 
 private:
     typedef struct{
@@ -31,7 +30,11 @@ private:
 
         double latitude = 0;
         double longitude = 0;
+
+        uint32_t last_update_time_ms = 0; 
     } Aircraft;
+
+    static constexpr uint32_t timeout_ms = 60000; 
 
     static constexpr size_t MAX_AIRCRAFT = 64;
 

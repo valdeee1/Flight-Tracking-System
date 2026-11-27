@@ -10,12 +10,14 @@ public:
 
     static double calculateLatitude(uint32_t latCprOdd, uint32_t latCprEven, bool isOddNewer);
     static double calculateLongitude(uint32_t lonCprOdd, uint32_t lonCprEven, bool isOddNewer, double latitude);
+    uint32_t calculateCRC(const uint8_t raw_bytes[14]); 
     uint32_t getIcao() const { return icao; }
     uint8_t getTypeCode() const { return type_code; }
     bool getIsOdd() const { return is_odd; }
     uint32_t getLatCpr() const { return lat_cpr; }
     uint32_t getLonCpr() const { return lon_cpr; }
     bool hasPositionData() const { return has_position_data; }
+    bool isValid() const { return isValidMessage; }
     int getDownlinkFormat() const { return downlink_format; }
 
 private:
@@ -26,6 +28,7 @@ private:
     uint32_t lat_cpr;
     uint32_t lon_cpr;
     bool has_position_data;
+    bool isValidMessage = true;
     uint8_t downlink_format;
 
     enum class Capability : uint8_t {

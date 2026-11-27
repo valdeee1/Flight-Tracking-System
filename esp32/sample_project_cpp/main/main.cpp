@@ -8,6 +8,7 @@
 #include <cmath>
 #include <cstring>
 #include "ads_b_message.h"
+#include "aircraft_tracker.h"
 
 static const char *TAG = "SPI";
 
@@ -24,6 +25,8 @@ constexpr gpio_num_t SPI_IRQ_PIN = GPIO_NUM_4;
 static TaskHandle_t spi_task_handle = nullptr;
 static spi_device_handle_t spi_handle = nullptr;
 
+QueueHandle_t spi_queue = xQueueCreate(10, sizeof(uint8_t[14]));
+
 static void IRAM_ATTR spi_irq_handler(void* arg) {
     BaseType_t xHigherPriorityTaskWoken = pdFALSE;
     // Notify the SPI task that an interrupt has occurred
@@ -38,7 +41,6 @@ extern "C" void app_main(void)
 {
     initSPIAndInterrupts();
 
-    QueueHandle_t spi_queue = xQueueCreate(10, sizeof(uint8_t[14]));
 
     xTaskCreatePinnedToCore(
         vParsingTask,
@@ -64,11 +66,19 @@ extern "C" void app_main(void)
 void vParsingTask(void *pvParameters) {
 
     // Example 8d461f9b69a9936aef8f984e1b9a
+    AircraftTracker tracker;
+    uint8_t rx_buffer[14] = {0};
     while(true)
     {
-
+        if(xQueueReceive(spi_queue, &rx_buffer, pdMS_TO_TICKS(1000)) == pdTRUE)
+        {
+            // Process the received SPI message
+            ADS_B_Message message(rx_buffer);
+            tracker.addOrUpdateAircraft(message);
+        } else {
+            tracker.deleteInActiveAircraft(); 
+        } 
     }
-    
 }
 
 void vSPITask(void *pvParameters) {
@@ -84,7 +94,7 @@ void vSPITask(void *pvParameters) {
 
     while(true)
     {
-        ulTaskNotifyTake(pdTRUE, portMAX_DELAY);
+        ulTaskNotifyTake(pdTRUE, 0);
 
         esp_err_t ret = spi_device_polling_transmit(spi_handle, &transmit);
 
@@ -95,6 +105,8 @@ void vSPITask(void *pvParameters) {
                      rx_buffer[4], rx_buffer[5], rx_buffer[6], rx_buffer[7],
                      rx_buffer[8], rx_buffer[9], rx_buffer[10], rx_buffer[11],
                      rx_buffer[12], rx_buffer[13]);
+
+            xQueueSend(spi_queue, &rx_buffer, portMAX_DELAY);
             
         } else {
             ESP_LOGE(TAG, "SPI ERROR: %s", esp_err_to_name(ret));

@@ -1,8 +1,13 @@
 #include "aircraft_tracker.h"
 #include "esp_log.h"
+#include "esp_timer.h"
 
 void AircraftTracker::addOrUpdateAircraft(const ADS_B_Message& message)
 {
+    if(!message.isValid()) {
+        return;
+    }
+
     Aircraft* target = nullptr;
     Aircraft* free_slot = nullptr;
 
@@ -31,8 +36,10 @@ void AircraftTracker::addOrUpdateAircraft(const ADS_B_Message& message)
         target = free_slot;
     }
 
+    target->last_update_time_ms = esp_timer_get_time() / 1000;
+
     if (message.hasPositionData())
-    {
+    {   
         if (message.getIsOdd())
         {
             target->odd_lat_cpr = message.getLatCpr();
@@ -59,3 +66,29 @@ void AircraftTracker::addOrUpdateAircraft(const ADS_B_Message& message)
     }
 }
 
+void AircraftTracker::deleteAircraft(uint32_t icao)
+{
+    for (auto& aircraft : aircraft_list)
+    {
+        if (aircraft.isActive && aircraft.icao == icao)
+        {
+            aircraft = Aircraft{}; 
+            break;
+        }
+    }
+}
+
+void AircraftTracker::deleteInActiveAircraft()
+{
+    uint32_t current_time_ms = esp_timer_get_time() / 1000;
+    for (auto& aircraft : aircraft_list)
+    {
+        if (aircraft.isActive)
+        {
+            if (current_time_ms - aircraft.last_update_time_ms > timeout_ms)
+            {
+            aircraft = Aircraft{}; 
+            }
+        }
+    }
+}
